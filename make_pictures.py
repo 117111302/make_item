@@ -2,15 +2,18 @@
 # -*- coding: utf8 -*-
 
 import re
+import os
 import sys
 import csv
 import codecs
+import shutil
 
-FIELD_NAMES = ['title', 'inputValues', 'picture' , 'outer_id']
+FIELDNAMES = ['item_no', 'title', 'price']
 DELIMITER = ','
 QUOTE_CHARACTER = '"'
 SCOPE = 15
 PREFIX = '116'
+BASE = os.path.realpath(os.path.dirname(__file__))
 
 
 def unicode_csv_reader(unicode_csv_data, **kwargs):
@@ -31,7 +34,7 @@ def parse_items(csv_reader):
     items = []
     for row in csv_reader:
         title =  row['title']
-        item_no, price = re.sub('JTYL', '', row['outer_id']).split(' ')
+        item_no, price = re.sub('JTYL', '', row['outer_id']).strip().split(' ')
         price = int(price.split('P')[1]) + SCOPE
         item_no = '%s%s' % (PREFIX, item_no)
         pictures = [(lambda x: x.split(':')[0])(x) for x in row['picture'].split(';')]
@@ -43,37 +46,42 @@ def parse_items(csv_reader):
 def mkdir(name):
     """create directroy to save item file
     """
-    pass
+    ipath = os.path.join(BASE, name)
+#    if os.path.isdir(ipath):
+#	print '%s is existed!' % (ipath,)
+#	os.rmdir(ipath)
+    if not os.path.exists(ipath):
+        os.mkdir(ipath)
+    return ipath
 
 
-def change_ext():
-    """change file extension
-    """
-    pass
-
-
-def copy_to_path(obj, dest)
+def copy_to_path(target, dest):
     """copy obj to destination directroy
     """
-    pass
+    shutil.copyfile(target, dest)
 
 
 def main():
     csvfile = sys.argv[1]
-#    with codecs.open(csvfile, 'rU', 'utf-16') as f:
+    pic_path = sys.argv[2]
     with open(csvfile, 'rb') as f:
         next(f)
-        items = parse_items(unicode_csv_reader(f))
-    print items
-    print '*'*80
+        items = parse_items(csv.DictReader(f))
     # write items to file
-    with open('file.txt', 'rw') as f:
+    with open('file.csv', 'wb') as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         for item in items:
-            ipath = mkdir(item[item_no])
-            for pic in pictures:
-                name = change_ext(pic)
-                copy_to_path(name, ipath)
-        f.write(item)
+            ipath = mkdir(item['item_no'])
+	    print 'Create path:', ipath
+            for pic in item['pictures']:
+		if not pic: continue
+                f_path = os.path.join(BASE, pic_path, '%s.tbi' % (pic,))
+		t_path = os.path.join(ipath, '%s.jpg' % (pic,))
+                copy_to_path(f_path, t_path)
+	    item.pop('pictures')
+	    writer.writerow(item)
+#	    f.write(str(item)+'\n')
+    print 'Make items total: %d' % len(items)
 
 
 if __name__ == '__main__':
