@@ -11,9 +11,11 @@ import shutil
 FIELDNAMES = ['item_no', 'title', 'price']
 DELIMITER = ','
 QUOTE_CHARACTER = '"'
-SCOPE = 15
 PREFIX = '116'
 BASE = os.path.realpath(os.path.dirname(__file__))
+PIFAJIA = '\xe6\x89\xb9\xe5\x8f\x91\xe4\xbb\xb7%s'
+JTYL = '\xe9\x94\xa6\xe8\x97\xa4\xe4\xbe\x9d\xe6\x81\x8b'
+SCOPE = int(sys.argv[3])
 
 
 def unicode_csv_reader(unicode_csv_data, **kwargs):
@@ -33,9 +35,9 @@ def parse_items(csv_reader):
     """
     items = []
     for row in csv_reader:
-        title =  row['title']
+        title =  re.sub('\w+', '', row['title'].decode('gbk').encode('utf-8').replace(JTYL, ''))
         item_no, price = re.sub('JTYL', '', row['outer_id']).strip().split(' ')
-        price = int(price.split('P')[1]) + SCOPE
+        price = PIFAJIA % str(int(price.split('P')[1]) + SCOPE)
         item_no = '%s%s' % (PREFIX, item_no)
         pictures = [(lambda x: x.split(':')[0])(x) for x in row['picture'].split(';')]
         item = dict(title=title, price=price, item_no=item_no, pictures=pictures)
@@ -62,24 +64,29 @@ def copy_to_path(target, dest):
 
 
 def main():
+    """
+    change the item name to what you want in csvfile
+    run it as ./make_pictures.py csvfile tbifilepath your_scope_price
+    """
     csvfile = sys.argv[1]
     pic_path = sys.argv[2]
     with open(csvfile, 'rb') as f:
         next(f)
         items = parse_items(csv.DictReader(f))
     # write items to file
-    with open('file.csv', 'wb') as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        for item in items:
-            ipath = mkdir(item['item_no'])
-	    print 'Create path:', ipath
-            for pic in item['pictures']:
-		if not pic: continue
-                f_path = os.path.join(BASE, pic_path, '%s.tbi' % (pic,))
-		t_path = os.path.join(ipath, '%s.jpg' % (pic,))
-                copy_to_path(f_path, t_path)
+    for item in items:
+        ipath = mkdir(item['item_no'])
+        print 'Create path:', ipath
+        for pic in item['pictures']:
+            if not pic: continue
+            f_path = os.path.join(BASE, pic_path, '%s.tbi' % (pic,))
+	    t_path = os.path.join(ipath, '%s.jpg' % (pic,))
+            copy_to_path(f_path, t_path)
+        with open(os.path.join(ipath, 'jiage.txt'), 'wb') as f:
+            #writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
 	    item.pop('pictures')
-	    writer.writerow(item)
+	    f.write(','.join(item.values()))
+	    #writer.writerow(item)
 #	    f.write(str(item)+'\n')
     print 'Make items total: %d' % len(items)
 
