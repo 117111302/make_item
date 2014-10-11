@@ -7,6 +7,7 @@ import sys
 import csv
 import codecs
 import shutil
+from subprocess import check_call, CalledProcessError
 
 FIELDNAMES = ['item_no', 'title', 'price']
 DELIMITER = ','
@@ -25,9 +26,34 @@ def unicode_csv_reader(unicode_csv_data, **kwargs):
     for row in csv_reader:
         yield row
 
+
 def utf_8_encoder(unicode_csv_data):
     for line in unicode_csv_data:
         yield line.encode('utf-8')
+
+
+def get_main_pic(desc_str, t_path):
+    """download pic to path
+    """
+    urls = get_pic_url_from_desc(desc_str)
+    print urls
+    for url in urls:
+        download(url, t_path)
+
+
+def get_pic_url_from_desc(desc_str):
+    return re.findall(r'(https?://\S+jpg)', desc_str)
+
+
+def download(href, localpath, verbosity=1):
+    "Download this to local path"
+    vopt = {0: '-q', 1: '-nv', 2: '-v'}.get(verbosity, 1)
+    cmd = ['wget', vopt, '-P', localpath, '--no-check-certificate']
+    cmd.append(href)
+    try:
+        return check_call(cmd)
+    except CalledProcessError as err:
+        raise
 
 
 def parse_items(csv_reader):
@@ -35,12 +61,17 @@ def parse_items(csv_reader):
     """
     items = []
     for row in csv_reader:
-        title =  re.sub('\w+', '', row['title'].decode('gbk').encode('utf-8').replace(JTYL, ''))
-        item_no, price = re.sub('JTYL', '', row['outer_id']).strip().split(' ')
-        price = PIFAJIA % str(int(price.split('P')[1]) + SCOPE)
+#        title =  re.sub('\w+', '', row['title'].decode('gbk').encode('utf-8').replace(JTYL, ''))
+#        item_no, price = re.sub('JTYL', '', row['outer_id']).strip().split(' ')
+#        price = PIFAJIA % str(int(price.split('P')[1]) + SCOPE)
+        title = row['title'].decode('gbk').encode('utf-8')
+        item_no, price = row['outer_id'].strip().split('P')
+        price = PIFAJIA % str(int(price) + SCOPE)
+
         item_no = '%s%s' % (PREFIX, item_no)
         pictures = [(lambda x: x.split(':')[0])(x) for x in row['picture'].split(';')]
-        item = dict(title=title, price=price, item_no=item_no, pictures=pictures)
+        description = row['description']
+        item = dict(title=title, price=price, item_no=item_no, pictures=pictures, description=description)
         items.append(item)
     return items
 
@@ -77,6 +108,7 @@ def main():
     for item in items:
         ipath = mkdir(item['item_no'])
         print 'Create path:', ipath
+        get_main_pic(item['description'], ipath)
         for pic in item['pictures']:
             if not pic: continue
             f_path = os.path.join(BASE, pic_path, '%s.tbi' % (pic,))
@@ -85,6 +117,7 @@ def main():
         with open(os.path.join(ipath, 'jiage.txt'), 'wb') as f:
             #writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
 	    item.pop('pictures')
+            item.pop('description')
 	    f.write(','.join(item.values()))
 	    #writer.writerow(item)
 #	    f.write(str(item)+'\n')
